@@ -39,19 +39,8 @@ def create_app(catalog_path: Path | None = None) -> FastAPI:
 
     resolved_catalog = catalog_path or DEFAULT_CATALOG_PATH
 
-    @app.get("/", response_class=HTMLResponse)
+    @app.api_route("/", methods=["GET", "HEAD"], response_class=HTMLResponse)
     async def index(request: Request) -> HTMLResponse:
-        return templates.TemplateResponse(
-            request,
-            "chatbot/index.html",
-            {
-                "starter_prompts": STARTER_PROMPTS,
-                "catalog_ready": resolved_catalog.exists(),
-            },
-        )
-
-    @app.head("/", response_class=HTMLResponse)
-    async def index_head(request: Request) -> HTMLResponse:
         return templates.TemplateResponse(
             request,
             "chatbot/index.html",
