@@ -6,9 +6,15 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
-import torch
-from torch import nn
-from transformers import AutoModel, AutoTokenizer
+try:
+    import torch
+    from torch import nn
+    from transformers import AutoModel, AutoTokenizer
+except ImportError:  # pragma: no cover - optional runtime dependency
+    torch = None
+    nn = None
+    AutoModel = None
+    AutoTokenizer = None
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -55,31 +61,36 @@ FIELD_LABELS: dict[str, list[str]] = {
 }
 
 
-class MultiHeadQueryParserModel(nn.Module):
-    def __init__(
-        self,
-        encoder_name: str,
-        field_labels: dict[str, list[str]] | None = None,
-        dropout: float = 0.1,
-    ) -> None:
-        super().__init__()
-        self.encoder_name = encoder_name
-        self.field_labels = field_labels or FIELD_LABELS
-        self.encoder = AutoModel.from_pretrained(encoder_name)
-        hidden_size = int(self.encoder.config.hidden_size)
-        self.dropout = nn.Dropout(dropout)
-        self.heads = nn.ModuleDict(
-            {
-                field: nn.Linear(hidden_size, len(labels))
-                for field, labels in self.field_labels.items()
-            }
-        )
+if nn is None:
+    class MultiHeadQueryParserModel:  # pragma: no cover - fallback stub
+        def __init__(self, *args: Any, **kwargs: Any) -> None:
+            raise RuntimeError("Local query parser dependencies are not installed")
+else:
+    class MultiHeadQueryParserModel(nn.Module):
+        def __init__(
+            self,
+            encoder_name: str,
+            field_labels: dict[str, list[str]] | None = None,
+            dropout: float = 0.1,
+        ) -> None:
+            super().__init__()
+            self.encoder_name = encoder_name
+            self.field_labels = field_labels or FIELD_LABELS
+            self.encoder = AutoModel.from_pretrained(encoder_name)
+            hidden_size = int(self.encoder.config.hidden_size)
+            self.dropout = nn.Dropout(dropout)
+            self.heads = nn.ModuleDict(
+                {
+                    field: nn.Linear(hidden_size, len(labels))
+                    for field, labels in self.field_labels.items()
+                }
+            )
 
-    def forward(self, input_ids: torch.Tensor, attention_mask: torch.Tensor) -> dict[str, torch.Tensor]:
-        outputs = self.encoder(input_ids=input_ids, attention_mask=attention_mask)
-        pooled = outputs.last_hidden_state[:, 0]
-        pooled = self.dropout(pooled)
-        return {field: head(pooled) for field, head in self.heads.items()}
+        def forward(self, input_ids: torch.Tensor, attention_mask: torch.Tensor) -> dict[str, torch.Tensor]:
+            outputs = self.encoder(input_ids=input_ids, attention_mask=attention_mask)
+            pooled = outputs.last_hidden_state[:, 0]
+            pooled = self.dropout(pooled)
+            return {field: head(pooled) for field, head in self.heads.items()}
 
 
 class LocalQueryParser:
@@ -149,6 +160,8 @@ class LocalQueryParser:
 
 @lru_cache(maxsize=1)
 def load_local_query_parser(model_dir: str | None = None) -> LocalQueryParser | None:
+    if torch is None or AutoTokenizer is None:
+        return None
     candidate = Path(model_dir or os.getenv("DAISO_LOCAL_QUERY_MODEL_DIR", str(DEFAULT_LOCAL_MODEL_DIR)))
     if not candidate.exists():
         return None
