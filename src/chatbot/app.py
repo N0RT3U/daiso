@@ -50,6 +50,17 @@ def create_app(catalog_path: Path | None = None) -> FastAPI:
             },
         )
 
+    @app.head("/", response_class=HTMLResponse)
+    async def index_head(request: Request) -> HTMLResponse:
+        return templates.TemplateResponse(
+            request,
+            "chatbot/index.html",
+            {
+                "starter_prompts": STARTER_PROMPTS,
+                "catalog_ready": resolved_catalog.exists(),
+            },
+        )
+
     @app.get("/healthz")
     async def healthz() -> dict[str, str]:
         return {"status": "ok"}
