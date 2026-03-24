@@ -15,12 +15,14 @@ services:
       DAISO_CHATBOT_MODEL: ${DAISO_CHATBOT_MODEL:-gpt-4o-mini}
     volumes:
       - ./models:/app/models
-    expose:
-      - "8000"
+    ports:
+      - "${DAISO_APP_PORT:-8000}:8000"
     restart: unless-stopped
 
   caddy:
     image: caddy:2.8-alpine
+    profiles:
+      - prod-domain
     depends_on:
       - app
     env_file:
@@ -36,6 +38,8 @@ services:
 
   duckdns:
     image: lscr.io/linuxserver/duckdns:latest
+    profiles:
+      - prod-domain
     env_file:
       - .env
     environment:
