@@ -35,6 +35,8 @@ Thumbs.db
 *.qix
 
 # Exceptions for lightweight docs/assets if needed
+!data/chatbot/daiso_chatbot_catalog.csv
+!static/chatbot/daiso_rogo.png
 !docs/**/*.pdf
 !hub_spoke_store_map_final.html
 
